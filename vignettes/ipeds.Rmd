@@ -1,0 +1,122 @@
+---
+title: "Building a harmonized IPEDS panel"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Building a harmonized IPEDS panel}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", eval = FALSE)
+```
+
+The `ipeds` package downloads complete data files from the IPEDS data center
+of the National Center for Education Statistics, attaches the variable and
+value labels from the official dictionaries, and harmonizes measures across
+changes in IPEDS definitions. The code in this vignette needs an internet
+connection and is not run when the vignette is built.
+
+## Finding the newest data
+
+IPEDS releases each survey component on its own schedule, first as
+provisional data and later as revised ("final") data.
+
+```{r}
+library(ipeds)
+ipeds_latest_year(c("HD", "EFA", "EFFY", "C_A", "ADM", "SFA", "GR", "F_F1A"))
+ipeds_available(c("EFA", "C_A"), 2022:2025)
+```
+
+The package prefers the revised (`_rv`) file inside each zip and re-checks
+cached files against NCES after `getOption("ipeds.max_age", 30)` days, so
+provisional data are replaced automatically once final data are published.
+
+## Building a panel
+
+```{r}
+latest <- ipeds_latest_year("HD")
+p <- ipeds_panel(years = 2004:latest)
+p
+```
+
+`year` is the year in, or implied by, the IPEDS file name: the 2023 row
+combines fall 2023 directory and enrollment data with 2022-23 completions,
+12-month enrollment and financial aid, and fiscal year 2023 finance. The
+codebook describes every variable, its source, its reference period and any
+harmonization notes:
+
+```{r}
+cb <- ipeds_codebook(p)
+cb[, c("variable", "label", "period", "years")]
+subset(cb, nzchar(notes), c(variable, notes))
+```
+
+Choose modules and options to suit the analysis:
+
+```{r}
+p <- ipeds_panel(
+  years = 2008:latest,
+  modules = c("directory", "enrollment", "completions", "grad_rates", "aid"),
+  race_bridge = TRUE,          # add *_bridged race columns
+  race_by_sex = FALSE,         # race totals only
+  grad_rates_by_race = TRUE,
+  child_records = "na"         # blank values reported with a parent campus
+)
+```
+
+## Comparable race/ethnicity series
+
+Between 2008 and 2010 institutions moved from seven race/ethnicity categories
+to nine. The panel reads each institution-year from the scheme it reported in
+and records it in `*_race_scheme`. The Asian and Native Hawaiian/Other
+Pacific Islander categories are combined into `*_asian_pi`, which matches the
+old Asian/Pacific Islander category. "Two or more races" did not exist
+before; with `race_bridge = TRUE` it is allocated proportionally to the
+single-race groups in `*_bridged` columns.
+
+```{r}
+library(stats)
+trend <- aggregate(cbind(enr_total, enr_hispanic, enr_asian_pi, enr_two_more) ~ year,
+                   data = p, FUN = sum, na.action = na.pass)
+trend
+```
+
+## Checking the harmonization
+
+Every harmonized measure is checked against the dictionary of the file it
+comes from. The audit trail records which variable or code was used and
+whether its label was verified:
+
+```{r}
+ipeds_audit(p, problems_only = TRUE)
+ipeds_validate(2004:latest)
+```
+
+A `relabeled` entry means the expected variable or code was absent or had a
+different label, and another one with the expected label was used. Measures
+that could not be identified are left missing.
+
+## Constant dollars and export
+
+```{r}
+p <- ipeds_real_dollars(p, base_year = 2024)
+ipeds_write(p, "ipeds_panel.dta")   # Stata, with labels
+ipeds_write(p, "ipeds_panel.csv")   # plus ipeds_panel_codebook.csv and _audit.csv
+```
+
+## Raw files
+
+Any IPEDS file can be read directly, with labels:
+
+```{r}
+hd <- ipeds_read("HD", latest)
+attr(hd$sector, "label")
+table(ipeds_as_factor(hd$sector))
+
+ipeds_dictionary("C_A", latest)
+ret <- ipeds_stack("EFD", 2010:latest, vars = c("ret_pcf", "ret_pcp"))
+```
+
+`ipeds_components()` lists the files the package knows how to locate, and
+`ipeds_read_file()` reads files outside the catalog by name.

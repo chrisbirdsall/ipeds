@@ -1,17 +1,19 @@
-require(devtools)
+# Development workflow (not part of the package build)
 
-setwd("c:/Dropbox/My Dropbox/Projects")
-setwd("~/Dropbox/Projects/")
+# Regenerate documentation and NAMESPACE
+roxygen2::roxygenise()
 
-document("ipeds")
-check_doc('ipeds')
-build("ipeds", path='..')
-build("ipeds", path='..', binary=TRUE)
-check("ipeds")
-install("ipeds")
+# Rebuild the datasets in data/ (see data-raw/)
+source("data-raw/datasets.R")
 
+# Run the offline test suite (uses a synthetic IPEDS server, no network)
+devtools::test()
+
+# Full check
+devtools::check()
+
+# Against the live NCES data center: confirm that every harmonized measure is
+# still identified correctly after a new IPEDS release
 library(ipeds)
-data(surveys)
-ls('package:ipeds')
-system.file(package='ipeds')
-downloadAllSurveys(2010)
+v <- ipeds_validate(2004:ipeds_latest_year("HD"))
+subset(v, relabeled > 0 | problem > 0)

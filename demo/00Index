@@ -1,4 +1,4 @@
-SATretention 	Explores the relationship between SAT scores and first year retention.
-Gender 	Examines the number of graduates by gender in math, statistics, and CIS from 2000 to 2002.
-Retention 	Example getting and using retention data.
-SATretention 	Explores the relationship between SAT scores and first year retention.
+panel           Build a harmonized panel and plot enrollment by race/ethnicity.
+Gender          Bachelor's degrees awarded to women in math, statistics and computer science.
+Retention       Admissions selectivity and retention rates.
+SATretention    The relationship between SAT scores and first-year retention.

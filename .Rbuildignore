@@ -1,2 +1,7 @@
 ^\.Rproj\.user$
 ^.*\.Rproj$
+^data-raw$
+^ipeds\.dev\.R$
+^README\.Rmd$
+^\.github$
+^\.claude$
